@@ -1,15 +1,38 @@
-// Anime Synthesizer Audio Engine (Zero external assets, 0ms latency, Web Audio API)
+// Anime Synthesizer Audio Engine & Hiroyuki Sawano (澤野 弘之) BGM Controller
+
+export interface BgmState {
+  isPlaying: boolean;
+  volume: number;
+  title: string;
+  composer: string;
+}
 
 class AnimeAudioEngine {
   private ctx: AudioContext | null = null;
-  private isMuted: boolean = true; // Default muted for smooth UX, user toggles in 1 click
+  private isMuted: boolean = true; // SFX muted state
   private listeners: Set<(muted: boolean) => void> = new Set();
+
+  // Hiroyuki Sawano BGM Controller
+  private bgmAudio: HTMLAudioElement | null = null;
+  private isBgmPlaying: boolean = false;
+  private bgmVolume: number = 0.45;
+  private bgmListeners: Set<(state: BgmState) => void> = new Set();
+  public readonly bgmTitle = "attack ON titan (Vocal: Mika Kobayashi)";
+  public readonly bgmComposer = "Hiroyuki Sawano // 澤野 弘之";
 
   constructor() {
     if (typeof window !== "undefined") {
-      const saved = localStorage.getItem("samanvaya_anime_sfx_muted");
-      if (saved !== null) {
-        this.isMuted = saved === "true";
+      const savedSfx = localStorage.getItem("samanvaya_anime_sfx_muted");
+      if (savedSfx !== null) {
+        this.isMuted = savedSfx === "true";
+      }
+
+      const savedVol = localStorage.getItem("samanvaya_bgm_volume");
+      if (savedVol !== null) {
+        const v = parseFloat(savedVol);
+        if (!isNaN(v) && v >= 0 && v <= 1) {
+          this.bgmVolume = v;
+        }
       }
     }
   }
@@ -28,6 +51,7 @@ class AnimeAudioEngine {
     return this.ctx;
   }
 
+  // --- SFX Controls ---
   public getMuted(): boolean {
     return this.isMuted;
   }
@@ -50,7 +74,118 @@ class AnimeAudioEngine {
     return () => this.listeners.delete(callback);
   }
 
-  // Anime hover blip (soft high chime)
+  // --- Hiroyuki Sawano BGM Controller ---
+  private initBgmAudio(): HTMLAudioElement | null {
+    if (typeof window === "undefined") return null;
+    if (!this.bgmAudio) {
+      const audio = new Audio("/audio/sawano-bgm.mp3");
+      audio.loop = true;
+      audio.volume = this.bgmVolume;
+      audio.preload = "auto";
+
+      audio.addEventListener("play", () => {
+        this.isBgmPlaying = true;
+        this.notifyBgmListeners();
+      });
+
+      audio.addEventListener("pause", () => {
+        this.isBgmPlaying = false;
+        this.notifyBgmListeners();
+      });
+
+      audio.addEventListener("ended", () => {
+        this.isBgmPlaying = false;
+        this.notifyBgmListeners();
+      });
+
+      audio.addEventListener("error", (e) => {
+        console.warn("Sawano BGM playback notice:", e);
+        this.isBgmPlaying = false;
+        this.notifyBgmListeners();
+      });
+
+      this.bgmAudio = audio;
+    }
+    return this.bgmAudio;
+  }
+
+  private notifyBgmListeners() {
+    const state: BgmState = {
+      isPlaying: this.isBgmPlaying,
+      volume: this.bgmVolume,
+      title: this.bgmTitle,
+      composer: this.bgmComposer,
+    };
+    this.bgmListeners.forEach((fn) => fn(state));
+  }
+
+  public subscribeBgm(callback: (state: BgmState) => void): () => void {
+    this.bgmListeners.add(callback);
+    callback({
+      isPlaying: this.isBgmPlaying,
+      volume: this.bgmVolume,
+      title: this.bgmTitle,
+      composer: this.bgmComposer,
+    });
+    return () => this.bgmListeners.delete(callback);
+  }
+
+  public async playBgm(): Promise<boolean> {
+    try {
+      const audio = this.initBgmAudio();
+      if (!audio) return false;
+      audio.volume = this.bgmVolume;
+      await audio.play();
+      this.isBgmPlaying = true;
+      this.notifyBgmListeners();
+      return true;
+    } catch (err) {
+      console.warn("Audio autoplay policy: interaction required before playback", err);
+      this.isBgmPlaying = false;
+      this.notifyBgmListeners();
+      return false;
+    }
+  }
+
+  public pauseBgm() {
+    if (this.bgmAudio) {
+      this.bgmAudio.pause();
+      this.isBgmPlaying = false;
+      this.notifyBgmListeners();
+    }
+  }
+
+  public toggleBgm(): Promise<boolean> {
+    if (this.isBgmPlaying) {
+      this.pauseBgm();
+      return Promise.resolve(false);
+    } else {
+      return this.playBgm();
+    }
+  }
+
+  public setBgmVolume(val: number) {
+    const clamped = Math.max(0, Math.min(1, val));
+    this.bgmVolume = clamped;
+    if (this.bgmAudio) {
+      this.bgmAudio.volume = clamped;
+    }
+    if (typeof window !== "undefined") {
+      localStorage.setItem("samanvaya_bgm_volume", clamped.toString());
+    }
+    this.notifyBgmListeners();
+  }
+
+  public getBgmState(): BgmState {
+    return {
+      isPlaying: this.isBgmPlaying,
+      volume: this.bgmVolume,
+      title: this.bgmTitle,
+      composer: this.bgmComposer,
+    };
+  }
+
+  // --- Sound Effects Synthesis ---
   public playHoverSound() {
     if (this.isMuted) return;
     try {
@@ -60,8 +195,8 @@ class AnimeAudioEngine {
       const gain = ctx.createGain();
 
       osc.type = "sine";
-      osc.frequency.setValueAtTime(880, ctx.currentTime); // A5
-      osc.frequency.exponentialRampToValueAtTime(1320, ctx.currentTime + 0.08); // E6
+      osc.frequency.setValueAtTime(880, ctx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(1320, ctx.currentTime + 0.08);
 
       gain.gain.setValueAtTime(0.04, ctx.currentTime);
       gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.08);
@@ -72,11 +207,10 @@ class AnimeAudioEngine {
       osc.start();
       osc.stop(ctx.currentTime + 0.08);
     } catch {
-      // Audio context restricted or unavailable
+      // Audio context restricted
     }
   }
 
-  // Anime click confirmation sound
   public playClickSound() {
     if (this.isMuted) return;
     try {
@@ -86,9 +220,9 @@ class AnimeAudioEngine {
       const gain = ctx.createGain();
 
       osc.type = "triangle";
-      osc.frequency.setValueAtTime(587.33, ctx.currentTime); // D5
-      osc.frequency.setValueAtTime(880, ctx.currentTime + 0.04); // A5
-      osc.frequency.setValueAtTime(1174.66, ctx.currentTime + 0.08); // D6
+      osc.frequency.setValueAtTime(587.33, ctx.currentTime);
+      osc.frequency.setValueAtTime(880, ctx.currentTime + 0.04);
+      osc.frequency.setValueAtTime(1174.66, ctx.currentTime + 0.08);
 
       gain.gain.setValueAtTime(0.08, ctx.currentTime);
       gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.16);
@@ -103,7 +237,6 @@ class AnimeAudioEngine {
     }
   }
 
-  // Anime power-up / Ki aura activation sound
   public playPowerUpSound() {
     if (this.isMuted) return;
     try {
@@ -135,13 +268,12 @@ class AnimeAudioEngine {
     }
   }
 
-  // Anime victory fanfare (for registration pass and S-Rank completion)
   public playVictoryFanfare() {
     if (this.isMuted) return;
     try {
       const ctx = this.initContext();
       if (!ctx) return;
-      const notes = [523.25, 659.25, 783.99, 1046.5]; // C5, E5, G5, C6
+      const notes = [523.25, 659.25, 783.99, 1046.5];
       notes.forEach((freq, i) => {
         const osc = ctx.createOscillator();
         const gain = ctx.createGain();

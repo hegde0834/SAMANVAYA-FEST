@@ -3,6 +3,7 @@ import "./globals.css";
 import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
 import CyberCanvas from "@/components/3d/CyberCanvas";
+import SawanoBgmPlayer from "@/components/layout/SawanoBgmPlayer";
 import { Toaster } from "sonner";
 
 export const viewport: Viewport = {
@@ -60,6 +61,9 @@ export default function RootLayout({
 
         {/* Global Footer (Strictly without mobile numbers) */}
         <Footer />
+
+        {/* Hiroyuki Sawano (澤野 弘之) Background Music Deck */}
+        <SawanoBgmPlayer />
 
         {/* Notification Toasts */}
         <Toaster
