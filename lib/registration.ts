@@ -29,70 +29,75 @@ export interface RegisterResult {
  * Strictly adheres to Requirement A: departmentName is stored once per team.
  */
 export async function registerTeam(data: RegistrationFormData): Promise<RegisterResult> {
-  const event = getEventBySlug(data.eventSlug);
-  if (!event) {
-    return { success: false, error: "Selected event not found." };
-  }
-
-  // Check event settings if present in database
-  const eventSetting = await prisma.eventSetting.findUnique({
-    where: { eventSlug: data.eventSlug },
-  });
-
-  if (eventSetting && !eventSetting.isOpen) {
-    return {
-      success: false,
-      error: `Registrations for ${event.name} are currently closed.`,
-    };
-  }
-
-  // Check team count limit
-  const currentCount = await prisma.registration.count({
-    where: {
-      eventSlug: data.eventSlug,
-      status: { not: "CANCELLED" },
-    },
-  });
-
-  const maxTeams = eventSetting?.maxTeams ?? (data.eventSlug === "prompting-the-image" ? 10 : 50);
-  if (currentCount >= maxTeams) {
-    return {
-      success: false,
-      error: `Registrations for ${event.name} have reached the maximum limit (${maxTeams} teams).`,
-    };
-  }
-
-  // Check if team name already exists for this event
-  const existingTeam = await prisma.registration.findFirst({
-    where: {
-      eventSlug: data.eventSlug,
-      teamName: {
-        equals: data.teamName,
-      },
-      status: { not: "CANCELLED" },
-    },
-  });
-
-  if (existingTeam) {
-    return {
-      success: false,
-      error: `A team named "${data.teamName}" is already registered for ${event.name}. Please choose a unique team name.`,
-    };
-  }
-
-  // Generate unique collision-resistant ID with database verification
-  let uniqueId = generateRegistrationId();
-  let attempts = 0;
-  while (attempts < 5) {
-    const exists = await prisma.registration.findUnique({
-      where: { registrationId: uniqueId },
-    });
-    if (!exists) break;
-    uniqueId = generateRegistrationId();
-    attempts++;
-  }
-
   try {
+    const event = getEventBySlug(data.eventSlug);
+    if (!event) {
+      return { success: false, error: "Selected event not found." };
+    }
+
+    // Check event settings if present in database (fallback to defaults if table empty)
+    let eventSetting = null;
+    try {
+      eventSetting = await prisma.eventSetting.findUnique({
+        where: { eventSlug: data.eventSlug },
+      });
+    } catch (dbCheckErr) {
+      console.warn("Notice: eventSetting check bypassed, falling back to default:", dbCheckErr);
+    }
+
+    if (eventSetting && !eventSetting.isOpen) {
+      return {
+        success: false,
+        error: `Registrations for ${event.name} are currently closed.`,
+      };
+    }
+
+    // Check team count limit
+    const currentCount = await prisma.registration.count({
+      where: {
+        eventSlug: data.eventSlug,
+        status: { not: "CANCELLED" },
+      },
+    });
+
+    const maxTeams = eventSetting?.maxTeams ?? (data.eventSlug === "prompting-the-image" ? 10 : 50);
+    if (currentCount >= maxTeams) {
+      return {
+        success: false,
+        error: `Registrations for ${event.name} have reached the maximum limit (${maxTeams} teams).`,
+      };
+    }
+
+    // Check if team name already exists for this event
+    const existingTeam = await prisma.registration.findFirst({
+      where: {
+        eventSlug: data.eventSlug,
+        teamName: {
+          equals: data.teamName,
+        },
+        status: { not: "CANCELLED" },
+      },
+    });
+
+    if (existingTeam) {
+      return {
+        success: false,
+        error: `A team named "${data.teamName}" is already registered for ${event.name}. Please choose a unique team name.`,
+      };
+    }
+
+    // Generate unique collision-resistant ID with database verification
+    let uniqueId = generateRegistrationId();
+    let attempts = 0;
+    while (attempts < 5) {
+      const exists = await prisma.registration.findUnique({
+        where: { registrationId: uniqueId },
+      });
+      if (!exists) break;
+      uniqueId = generateRegistrationId();
+      attempts++;
+    }
+
     // Database Transaction: Source of truth
     const createdRegistration = await prisma.$transaction(async (tx) => {
       const reg = await tx.registration.create({
@@ -121,19 +126,17 @@ export async function registerTeam(data: RegistrationFormData): Promise<Register
       return reg;
     });
 
-    // Asynchronously update local Excel export file without blocking response
-    // An Excel generation failure does NOT erase or rollback the successful registration!
-    (async () => {
-      try {
-        const allRegistrations = await prisma.registration.findMany({
-          orderBy: { createdAt: "desc" },
-          include: { members: { orderBy: { memberIndex: "asc" } } },
-        });
-        await syncLocalExcelExport(allRegistrations);
-      } catch (excelErr) {
-        console.error("Non-fatal: Background Excel sync error:", excelErr);
-      }
-    })();
+    // Safely attempt local Excel sync in non-serverless environments
+    try {
+      const allRegistrations = await prisma.registration.findMany({
+        orderBy: { createdAt: "desc" },
+        include: { members: { orderBy: { memberIndex: "asc" } } },
+      });
+      await syncLocalExcelExport(allRegistrations);
+    } catch (excelErr) {
+      // Non-fatal: Excel generation failure never invalidates database registration
+      console.warn("Non-fatal: Background Excel sync skipped:", excelErr);
+    }
 
     return {
       success: true,
@@ -143,7 +146,10 @@ export async function registerTeam(data: RegistrationFormData): Promise<Register
     console.error("Database registration error:", err);
     return {
       success: false,
-      error: err.message || "Failed to commit registration to database.",
+      error:
+        err?.message?.includes("Can't reach database") || err?.code === "P1001"
+          ? "Unable to reach database server. Please ensure DATABASE_URL is configured."
+          : err?.message || "Failed to commit registration to database.",
     };
   }
 }

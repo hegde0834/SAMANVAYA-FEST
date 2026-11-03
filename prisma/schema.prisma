@@ -5,7 +5,7 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
@@ -53,7 +53,7 @@ model EventSetting {
   eventName      String
   isOpen         Boolean      @default(true)
   maxTeams       Int          @default(50)
-  dateText       String       @default("To Be Announced")
+  dateText       String       @default("20th Nov")
   venueText      String       @default("NIE North Campus, Mysuru")
   updatedAt      DateTime     @updatedAt
 }

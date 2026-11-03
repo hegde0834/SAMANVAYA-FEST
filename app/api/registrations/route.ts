@@ -56,10 +56,15 @@ export async function POST(req: NextRequest) {
     );
   } catch (error: any) {
     console.error("API registration error:", error);
+    const errorMessage =
+      error?.message?.includes("Can't reach database") || error?.code === "P1001"
+        ? "Unable to reach database server. Please verify DATABASE_URL in environment configuration."
+        : error?.message || "An unexpected server error occurred during registration.";
+
     return NextResponse.json(
       {
         success: false,
-        error: "An unexpected server error occurred during registration.",
+        error: errorMessage,
       },
       { status: 500 }
     );

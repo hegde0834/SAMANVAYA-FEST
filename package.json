@@ -9,6 +9,8 @@
     "lint": "next lint",
     "db:push": "prisma db push",
     "db:generate": "prisma generate",
+    "db:postgres": "node scripts/switch-db.js postgres && prisma generate",
+    "db:sqlite": "node scripts/switch-db.js sqlite && prisma generate",
     "test": "vitest run"
   },
   "dependencies": {

@@ -168,15 +168,26 @@ export function buildRegistrationsWorkbook(registrations: ExportableRegistration
 
 /**
  * Saves or updates local development excel workbook at `data/SAMANVAYA_2_0_Registrations.xlsx`
+ * Safely bypassed in serverless / Vercel environments where disk is read-only.
  */
 export async function syncLocalExcelExport(registrations: ExportableRegistration[]): Promise<string> {
-  const dataDir = path.join(process.cwd(), "data");
-  if (!fs.existsSync(dataDir)) {
-    fs.mkdirSync(dataDir, { recursive: true });
+  // Serverless environments like Vercel have read-only filesystems
+  if (process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME) {
+    return "";
   }
 
-  const filePath = path.join(dataDir, "SAMANVAYA_2_0_Registrations.xlsx");
-  const workbook = buildRegistrationsWorkbook(registrations);
-  await workbook.xlsx.writeFile(filePath);
-  return filePath;
+  try {
+    const dataDir = path.join(process.cwd(), "data");
+    if (!fs.existsSync(dataDir)) {
+      fs.mkdirSync(dataDir, { recursive: true });
+    }
+
+    const filePath = path.join(dataDir, "SAMANVAYA_2_0_Registrations.xlsx");
+    const workbook = buildRegistrationsWorkbook(registrations);
+    await workbook.xlsx.writeFile(filePath);
+    return filePath;
+  } catch (err) {
+    console.warn("Non-fatal: Skipping local excel file write:", err);
+    return "";
+  }
 }
