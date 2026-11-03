@@ -19,6 +19,8 @@ import {
   ChevronRight,
   Eye,
   X,
+  Trash2,
+  AlertTriangle,
   FileSpreadsheet,
   Sword,
   Flame,
@@ -82,6 +84,10 @@ export default function AdminDashboard() {
 
   // Selected Team Modal
   const [activeTeamDetail, setActiveTeamDetail] = useState<RegistrationRecord | null>(null);
+
+  // Deletion States
+  const [registrationToDelete, setRegistrationToDelete] = useState<RegistrationRecord | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
     checkAuth();
@@ -245,6 +251,40 @@ export default function AdminDashboard() {
       }
     } catch {
       toast.error("Network error");
+    }
+  };
+
+  const handleDeleteRegistration = async (registrationId: string) => {
+    animeAudio.playClickSound();
+    setIsDeleting(true);
+    try {
+      const token = getActiveToken();
+      const res = await fetch("/api/admin/registrations", {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ registrationId }),
+      });
+
+      const data = await res.json();
+
+      if (res.ok && data.success) {
+        toast.success(`Registration ${registrationId} deleted successfully.`);
+        setRegistrations((prev) => prev.filter((r) => r.registrationId !== registrationId));
+        if (activeTeamDetail?.registrationId === registrationId) {
+          setActiveTeamDetail(null);
+        }
+        setRegistrationToDelete(null);
+        fetchRegistrations(pagination.page);
+      } else {
+        toast.error(data.error || "Failed to delete registration");
+      }
+    } catch {
+      toast.error("Network error while deleting registration");
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -577,16 +617,28 @@ export default function AdminDashboard() {
                           </select>
                         </td>
                         <td className="py-3.5 px-4">
-                          <button
-                            onClick={() => {
-                              animeAudio.playClickSound();
-                              setActiveTeamDetail(reg);
-                            }}
-                            className="p-1.5 rounded-lg bg-[#091029] border border-[#182752] text-gray-300 hover:text-[#00f3ff] hover:border-[#00f3ff]/50 transition-colors"
-                            title="Inspect Guild Party"
-                          >
-                            <Eye className="w-4 h-4" />
-                          </button>
+                          <div className="flex items-center gap-1.5">
+                            <button
+                              onClick={() => {
+                                animeAudio.playClickSound();
+                                setActiveTeamDetail(reg);
+                              }}
+                              className="p-1.5 rounded-lg bg-[#091029] border border-[#182752] text-gray-300 hover:text-[#00f3ff] hover:border-[#00f3ff]/50 transition-colors"
+                              title="Inspect Guild Party"
+                            >
+                              <Eye className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => {
+                                animeAudio.playClickSound();
+                                setRegistrationToDelete(reg);
+                              }}
+                              className="p-1.5 rounded-lg bg-[#091029] border border-[#182752] text-gray-400 hover:text-red-400 hover:border-red-500/50 hover:bg-red-500/10 transition-colors"
+                              title="Delete Dummy / Unwanted Registration"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))
@@ -743,12 +795,95 @@ export default function AdminDashboard() {
               ))}
             </div>
 
-            <div className="flex justify-end gap-3 pt-4 border-t border-[#182752]">
+            <div className="flex justify-between items-center gap-3 pt-4 border-t border-[#182752]">
+              <button
+                onClick={() => {
+                  animeAudio.playClickSound();
+                  setRegistrationToDelete(activeTeamDetail);
+                }}
+                className="px-4 py-2 rounded-xl bg-red-500/10 border border-red-500/30 text-xs font-mono font-bold text-red-400 hover:bg-red-500/20 hover:border-red-500 flex items-center gap-1.5 transition-colors"
+                title="Delete this dummy / test registration"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>DELETE // 削除</span>
+              </button>
               <button
                 onClick={() => setActiveTeamDetail(null)}
                 className="px-5 py-2.5 rounded-xl bg-[#091029] border border-[#182752] text-xs font-mono font-bold text-white hover:border-[#00f3ff]"
               >
                 CLOSE // 閉じる
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {registrationToDelete && (
+        <div
+          className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4"
+          onClick={() => !isDeleting && setRegistrationToDelete(null)}
+        >
+          <div
+            className="anime-manga-card p-6 rounded-2xl max-w-md w-full border border-red-500/50 shadow-neon-magenta"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center gap-3 text-red-400 mb-3">
+              <div className="w-10 h-10 rounded-xl bg-red-500/20 border border-red-500/40 flex items-center justify-center">
+                <AlertTriangle className="w-5 h-5 text-red-400 animate-pulse" />
+              </div>
+              <div>
+                <span className="text-[10px] font-mono text-red-400 font-bold tracking-widest uppercase">
+                  CONFIRM DELETION // 削除確認
+                </span>
+                <h3 className="font-anime font-black text-lg text-white">
+                  Delete Registration?
+                </h3>
+              </div>
+            </div>
+
+            <div className="p-3.5 rounded-xl bg-[#050918] border border-[#182752] mb-4 space-y-1">
+              <div className="text-xs font-mono text-gray-400">
+                ID: <span className="text-[#00f3ff] font-bold">{registrationToDelete.registrationId}</span>
+              </div>
+              <div className="text-sm font-bold text-white">
+                Team: {registrationToDelete.teamName}
+              </div>
+              <div className="text-xs text-gray-300">
+                Event: {registrationToDelete.eventName} ({registrationToDelete.members.length} members)
+              </div>
+            </div>
+
+            <p className="text-xs text-gray-300 leading-relaxed mb-6 font-normal">
+              Are you sure you want to permanently delete this registration? All team member records will be erased from the database. This action cannot be undone.
+            </p>
+
+            <div className="flex items-center justify-end gap-3">
+              <button
+                type="button"
+                disabled={isDeleting}
+                onClick={() => setRegistrationToDelete(null)}
+                className="px-4 py-2 rounded-xl bg-[#091029] border border-[#182752] text-xs font-mono font-bold text-gray-300 hover:text-white"
+              >
+                CANCEL
+              </button>
+              <button
+                type="button"
+                disabled={isDeleting}
+                onClick={() => handleDeleteRegistration(registrationToDelete.registrationId)}
+                className="px-5 py-2 rounded-xl bg-gradient-to-r from-red-600 to-rose-700 hover:from-red-500 hover:to-rose-600 border border-red-500 text-xs font-mono font-bold text-white shadow-neon-magenta flex items-center gap-2 disabled:opacity-50"
+              >
+                {isDeleting ? (
+                  <>
+                    <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    <span>DELETING...</span>
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>CONFIRM DELETE</span>
+                  </>
+                )}
               </button>
             </div>
           </div>

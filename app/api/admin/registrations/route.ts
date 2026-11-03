@@ -126,3 +126,54 @@ export async function PATCH(req: NextRequest) {
     );
   }
 }
+
+export async function DELETE(req: NextRequest) {
+  const authHeader = req.headers.get("Authorization");
+  const isAuth = await isAuthenticatedAdmin(authHeader);
+
+  if (!isAuth) {
+    return NextResponse.json(
+      { error: "Unauthorized. Admin credentials required." },
+      { status: 401 }
+    );
+  }
+
+  try {
+    const { registrationId } = await req.json();
+
+    if (!registrationId) {
+      return NextResponse.json(
+        { error: "Registration ID is required for deletion." },
+        { status: 400 }
+      );
+    }
+
+    const existing = await prisma.registration.findUnique({
+      where: { registrationId },
+      include: { members: true },
+    });
+
+    if (!existing) {
+      return NextResponse.json(
+        { error: "Registration record not found." },
+        { status: 404 }
+      );
+    }
+
+    // Cascade delete registration and all associated members
+    await prisma.registration.delete({
+      where: { registrationId },
+    });
+
+    return NextResponse.json({
+      success: true,
+      message: `Registration ${registrationId} (${existing.teamName}) deleted successfully.`,
+    });
+  } catch (error: any) {
+    console.error("Admin registration delete error:", error);
+    return NextResponse.json(
+      { error: error?.message || "Failed to delete registration record." },
+      { status: 500 }
+    );
+  }
+}
