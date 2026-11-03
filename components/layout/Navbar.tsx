@@ -59,30 +59,30 @@ export default function Navbar() {
             href="/"
             onClick={handleNavClick}
             onMouseEnter={handleHover}
-            className="flex items-center gap-3 group focus:outline-none focus:ring-2 focus:ring-[#00f3ff] rounded-lg p-1"
+            className="flex items-center gap-2 sm:gap-3 group focus:outline-none focus:ring-2 focus:ring-[#00f3ff] rounded-lg p-0.5 sm:p-1 shrink-0"
             aria-label="SAMANVAYA 2.0 Home"
           >
-            <div className="relative w-11 h-11 rounded-xl bg-gradient-to-br from-[#00f3ff] via-[#9d4edd] to-[#ff007f] p-0.5 flex items-center justify-center shadow-neon-cyan group-hover:scale-105 group-hover:rotate-3 transition-transform">
+            <div className="relative w-9 h-9 sm:w-11 sm:h-11 rounded-xl bg-gradient-to-br from-[#00f3ff] via-[#9d4edd] to-[#ff007f] p-0.5 flex items-center justify-center shadow-neon-cyan group-hover:scale-105 group-hover:rotate-3 transition-transform shrink-0">
               <div className="w-full h-full bg-[#030612] rounded-[10px] flex items-center justify-center relative overflow-hidden">
-                <span className="font-kanji absolute text-[18px] font-black text-white/10 group-hover:text-cyan-400/20 transition-colors">
+                <span className="font-kanji absolute text-[16px] sm:text-[18px] font-black text-white/10 group-hover:text-cyan-400/20 transition-colors">
                   覚
                 </span>
-                <Sparkles className="w-5 h-5 text-[#00f3ff] animate-pulse relative z-10" />
+                <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 text-[#00f3ff] animate-pulse relative z-10" />
               </div>
             </div>
             <div className="flex flex-col">
-              <div className="flex items-center gap-1.5">
-                <span className="font-anime font-black text-lg sm:text-xl tracking-wider text-white group-hover:text-[#00f3ff] transition-colors">
+              <div className="flex items-center gap-1 sm:gap-1.5">
+                <span className="font-anime font-black text-base sm:text-xl tracking-wider text-white group-hover:text-[#00f3ff] transition-colors whitespace-nowrap">
                   SAMANVAYA <span className="text-[#00f3ff] glow-text-cyan">2.0</span>
                 </span>
-                <span className="font-kanji text-[10px] px-1.5 py-0.5 rounded bg-[#ff007f]/20 border border-[#ff007f]/40 text-[#ff85a2] font-bold">
+                <span className="font-kanji text-[9px] sm:text-[10px] px-1 sm:px-1.5 py-0.5 rounded bg-[#ff007f]/20 border border-[#ff007f]/40 text-[#ff85a2] font-bold shrink-0">
                   覚醒
                 </span>
               </div>
-              <span className="text-[10px] tracking-widest uppercase font-mono text-cyan-400/80 font-semibold flex items-center gap-1">
+              <span className="text-[9px] sm:text-[10px] tracking-widest uppercase font-mono text-cyan-400/80 font-semibold flex items-center gap-1 whitespace-nowrap">
                 <span>NIE MCA FEST</span>
                 <span className="text-gray-500">•</span>
-                <span className="font-kanji text-gray-400 text-[9px]">サマンバヤ</span>
+                <span className="font-kanji text-gray-400 text-[8px] sm:text-[9px]">サマンバヤ</span>
               </span>
             </div>
           </Link>
@@ -148,26 +148,33 @@ export default function Navbar() {
             </Link>
           </div>
 
-          {/* Mobile Menu & SFX */}
-          <div className="flex md:hidden items-center gap-2">
-            <AnimeAudioToggle />
+          {/* Mobile Menu & Controls */}
+          <div className="flex md:hidden items-center gap-1.5 sm:gap-2 shrink-0">
+            {/* Compact Music Button (Icon-only on mobile) */}
+            <AnimeAudioToggle compact={true} />
+
+            {/* Mobile Register Button - Perfectly visible without clipping */}
             <Link
               href="/register"
               onClick={handleNavClick}
-              className="cyber-button-cyan px-3 py-1.5 rounded-lg text-xs font-bold"
+              className="cyber-button-cyan px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-bold inline-flex items-center gap-1 shadow-neon-cyan shrink-0"
+              title="Register Your Party"
             >
-              Register
+              <Sword className="w-3.5 h-3.5 text-[#030612]" />
+              <span>Register</span>
             </Link>
+
+            {/* Mobile Hamburger Menu Toggle */}
             <button
               onClick={() => {
                 animeAudio.playClickSound();
                 setMobileMenuOpen(!mobileMenuOpen);
               }}
-              className="p-2 rounded-lg bg-[#091029] border border-[#182752] text-gray-200 hover:text-[#00f3ff] focus:outline-none"
+              className="p-1.5 sm:p-2 rounded-xl bg-[#091029] border border-[#182752] text-gray-200 hover:text-[#00f3ff] hover:border-[#00f3ff]/50 focus:outline-none shrink-0"
               aria-expanded={mobileMenuOpen}
               aria-label="Toggle navigation menu"
             >
-              {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+              {mobileMenuOpen ? <X className="w-5 h-5 text-[#00f3ff]" /> : <Menu className="w-5 h-5" />}
             </button>
           </div>
         </div>
@@ -177,6 +184,12 @@ export default function Navbar() {
       {mobileMenuOpen && (
         <div className="md:hidden bg-[#050918]/98 backdrop-blur-2xl border-b border-[#182752] shadow-2xl px-6 pt-4 pb-6 transition-all duration-300">
           <nav className="flex flex-col gap-3" aria-label="Mobile Navigation">
+            {/* Audio Deck Inside Drawer */}
+            <div className="pb-3 border-b border-[#182752] flex items-center justify-between">
+              <span className="text-xs font-mono text-gray-400">Audio Deck:</span>
+              <AnimeAudioToggle />
+            </div>
+
             {navLinks.map((link) => (
               <Link
                 key={link.href}
