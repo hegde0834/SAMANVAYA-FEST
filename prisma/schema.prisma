@@ -1,0 +1,59 @@
+// Prisma schema for SAMANVAYA 2.0 Fest Registration System
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Registration {
+  id             String       @id @default(cuid())
+  registrationId String       @unique // E.g., SAM2-2026-A8F3K9Q2
+  teamName       String
+  eventSlug      String       // reel-campus, prompting-the-image, treasure-hunt, kairos
+  eventName      String
+  
+  // Requirement A: Exactly ONE shared department field for the entire team
+  departmentName String
+  
+  status         String       @default("CONFIRMED") // CONFIRMED, WAITLISTED, CANCELLED
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  
+  // Relations: One-to-many with TeamMember
+  members        TeamMember[]
+
+  @@index([eventSlug])
+  @@index([registrationId])
+  @@index([teamName])
+}
+
+model TeamMember {
+  id             String       @id @default(cuid())
+  registrationId String
+  registration   Registration @relation(fields: [registrationId], references: [id], onDelete: Cascade)
+  
+  fullName       String
+  phoneNumber    String
+  collegeEmail   String
+  memberIndex    Int          // 1, 2, 3, 4
+  
+  // STRICT RULE: No department field here!
+  // All members share Registration.departmentName
+
+  @@index([registrationId])
+}
+
+model EventSetting {
+  id             String       @id @default(cuid())
+  eventSlug      String       @unique
+  eventName      String
+  isOpen         Boolean      @default(true)
+  maxTeams       Int          @default(50)
+  dateText       String       @default("To Be Announced")
+  venueText      String       @default("NIE North Campus, Mysuru")
+  updatedAt      DateTime     @updatedAt
+}
